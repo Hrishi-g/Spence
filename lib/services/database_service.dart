@@ -52,16 +52,21 @@ class DatabaseService {
     Icons.sports_bar_outlined,
     Icons.home_outlined,
     Icons.account_balance_outlined,
+    Icons.category,
+    Icons.help_outline,
+    Icons.attach_money,
+    Icons.shopping_cart,
+    Icons.receipt,
+    Icons.savings,
+    Icons.payments,
   ];
 
+  static final Map<int, IconData> _iconCodeMap = {
+    for (final icon in _allKnownIcons) icon.codePoint: icon,
+  };
+
   static IconData getIconFromCode(int codePoint, [String? fontFamily]) {
-    for (final icon in _allKnownIcons) {
-      if (icon.codePoint == codePoint) {
-        return icon;
-      }
-    }
-    // ignore: non_const_argument_for_const_parameter
-    return IconData(codePoint, fontFamily: fontFamily ?? 'MaterialIcons');
+    return _iconCodeMap[codePoint] ?? Icons.category;
   }
 
   /// Returns the active SQLite database instance, initializing it if necessary.
