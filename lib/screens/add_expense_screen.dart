@@ -8,12 +8,14 @@ import 'all_accounts_modal.dart';
 class AddExpenseScreen extends StatefulWidget {
   final ExpenseState expenseState;
   final ExpenseTransaction? initialTransaction;
+  final DateTime? initialDate;
   final VoidCallback? onExpenseAdded;
 
   const AddExpenseScreen({
     super.key,
     required this.expenseState,
     this.initialTransaction,
+    this.initialDate,
     this.onExpenseAdded,
   });
 
@@ -25,6 +27,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
   String _amountRaw = '';
   late CategoryItem _selectedCategory;
   late AccountItem _selectedAccount;
+  late List<CategoryItem> _visibleCategories;
   DateTime _selectedDate = DateTime.now();
 
   final TextEditingController _noteController = TextEditingController();
@@ -45,6 +48,19 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
     } else {
       _selectedCategory = widget.expenseState.top5Categories.first;
       _selectedAccount = widget.expenseState.topAccounts.first;
+      _selectedDate = widget.initialDate ?? widget.expenseState.selectedCalendarDate ?? DateTime.now();
+    }
+
+    _visibleCategories = List.from(widget.expenseState.top5Categories);
+    final existingIndex = _visibleCategories.indexWhere((c) => c.id == _selectedCategory.id);
+    if (existingIndex == -1) {
+      if (_visibleCategories.length >= 5) {
+        _visibleCategories.removeLast();
+      }
+      _visibleCategories.insert(0, _selectedCategory);
+    } else if (existingIndex != 0) {
+      _visibleCategories.removeAt(existingIndex);
+      _visibleCategories.insert(0, _selectedCategory);
     }
   }
 
@@ -181,6 +197,16 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
         onSelectCategory: (cat) {
           setState(() {
             _selectedCategory = cat;
+            final existingIndex = _visibleCategories.indexWhere((c) => c.id == cat.id);
+            if (existingIndex == -1) {
+              if (_visibleCategories.length >= 5) {
+                _visibleCategories.removeLast();
+              }
+              _visibleCategories.insert(0, cat);
+            } else {
+              _visibleCategories.removeAt(existingIndex);
+              _visibleCategories.insert(0, cat);
+            }
           });
         },
       ),
@@ -234,12 +260,6 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
           duration: const Duration(seconds: 2),
         ),
       );
-      if (widget.onExpenseAdded != null) {
-        widget.onExpenseAdded!();
-      } else if (Navigator.canPop(context)) {
-        Navigator.pop(context);
-      }
-      return;
     } else {
       widget.expenseState.addTransaction(
         amount: amount,
@@ -257,14 +277,13 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
       );
     }
 
-    setState(() {
-      _amountRaw = '';
-      _noteController.clear();
-      _selectedDate = DateTime.now();
-    });
+    widget.expenseState.selectedCalendarDate = null;
 
     if (widget.onExpenseAdded != null) {
       widget.onExpenseAdded!();
+    }
+    if (mounted && Navigator.canPop(context)) {
+      Navigator.of(context).popUntil((route) => route.isFirst);
     }
   }
 
@@ -443,8 +462,6 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
   }
 
   Widget _buildCategorySection() {
-    final topCategories = widget.expenseState.top5Categories;
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -462,7 +479,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
           spacing: 8,
           runSpacing: 8,
           children: [
-            ...topCategories.map((cat) {
+            ..._visibleCategories.map((cat) {
               final isSelected = cat.id == _selectedCategory.id;
               return GestureDetector(
                 onTap: () {
@@ -652,7 +669,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             itemCount: suggestions.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 8),
+            separatorBuilder: (_, _) => const SizedBox(width: 8),
             itemBuilder: (context, index) {
               final desc = suggestions[index];
               final isMatchingExact =

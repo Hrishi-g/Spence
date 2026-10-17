@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../models/transaction_model.dart';
 import '../state/expense_state.dart';
 import '../theme/app_theme.dart';
 import 'add_expense_screen.dart';
@@ -43,8 +42,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
       MaterialPageRoute(
         builder: (context) => AddExpenseScreen(
           expenseState: widget.expenseState,
+          initialDate: _selectedDay,
           onExpenseAdded: () {
-            setState(() {});
+            widget.expenseState.resetToCurrentDate();
+            Navigator.of(context).popUntil((route) => route.isFirst);
           },
         ),
       ),
@@ -171,6 +172,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                             onTap: () {
                               setState(() {
                                 _selectedDay = date;
+                                widget.expenseState.selectedCalendarDate = date;
                               });
                             },
                             child: Container(

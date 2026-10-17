@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/transaction_model.dart';
+import '../services/database_service.dart';
 
 class ExpenseState extends ChangeNotifier {
   final List<ExpenseTransaction> _transactions = [];
@@ -11,19 +12,12 @@ class ExpenseState extends ChangeNotifier {
 
   DateTime _selectedMonth = DateTime.now();
   DateTime? _selectedCalendarDate;
+  bool _isInitialized = false;
+  Future<void>? _initFuture;
 
-  final List<String> _savedDescriptions = [
-    'Khana',
-    'Dinner with friends',
-    'Super hair',
-    'Groceries',
-    'Metro recharge',
-    'Snacks',
-    'Coffee',
-    'Medicines',
-    'Shopping',
-    'Fuel',
-  ];
+  bool get isInitialized => _isInitialized;
+
+  final List<String> _savedDescriptions = [];
 
   List<String> get savedDescriptions => List.unmodifiable(_savedDescriptions);
 
@@ -45,19 +39,97 @@ class ExpenseState extends ChangeNotifier {
     );
     if (!exists) {
       _savedDescriptions.insert(0, trimmed);
+      DatabaseService.instance.insertSavedDescription(trimmed);
       notifyListeners();
     }
   }
 
   void deleteSavedDescription(String description) {
+    final trimmed = description.trim();
     _savedDescriptions.removeWhere(
-      (d) => d.toLowerCase() == description.trim().toLowerCase(),
+      (d) => d.toLowerCase() == trimmed.toLowerCase(),
     );
+    DatabaseService.instance.deleteSavedDescription(trimmed);
     notifyListeners();
   }
 
-  ExpenseState() {
-    _loadInitialSampleData();
+  ExpenseState();
+
+  Future<void> initialize() async {
+    if (_isInitialized) return;
+    if (_initFuture != null) return _initFuture!;
+    _initFuture = _doInitialize();
+    return _initFuture!;
+  }
+
+  Future<void> _doInitialize() async {
+    try {
+      final dbService = DatabaseService.instance;
+      await dbService.init();
+      await _loadFromDatabase();
+      _isInitialized = true;
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error initializing database: $e');
+    }
+  }
+
+  Future<void> reloadFromDatabase() async {
+    await _loadFromDatabase();
+    notifyListeners();
+  }
+
+  Future<String> getDatabasePath() async {
+    return await DatabaseService.instance.getDatabasePath();
+  }
+
+  Future<bool> importDatabase(String sourceFilePath) async {
+    final success = await DatabaseService.instance.importDatabase(sourceFilePath);
+    if (success) {
+      await _loadFromDatabase();
+      notifyListeners();
+      return true;
+    }
+    return false;
+  }
+
+  Future<String> exportDatabase({String? destinationDirectory}) async {
+    return await DatabaseService.instance.exportDatabase(destinationDirectory: destinationDirectory);
+  }
+
+  Future<void> _loadFromDatabase() async {
+    final dbService = DatabaseService.instance;
+    final dbCategories = await dbService.getCategories();
+    if (dbCategories.isNotEmpty) {
+      _allCategories.clear();
+      _allCategories.addAll(dbCategories);
+    }
+
+    final dbAccounts = await dbService.getAccounts();
+    if (dbAccounts.isNotEmpty) {
+      _allAccounts.clear();
+      _allAccounts.addAll(dbAccounts);
+    }
+
+    final dbDescriptions = await dbService.getSavedDescriptions();
+    if (dbDescriptions.isNotEmpty) {
+      _savedDescriptions.clear();
+      _savedDescriptions.addAll(dbDescriptions);
+    }
+
+    final catMap = {for (var c in _allCategories) c.id: c};
+    final accMap = {for (var a in _allAccounts) a.id: a};
+
+    final dbTransactions = await dbService.getTransactions(catMap, accMap);
+    _transactions.clear();
+    _transactions.addAll(dbTransactions);
+
+    _categoryUsageCount.clear();
+    _accountUsageCount.clear();
+    for (var tx in _transactions) {
+      _categoryUsageCount[tx.category.id] = (_categoryUsageCount[tx.category.id] ?? 0) + 1;
+      _accountUsageCount[tx.account.id] = (_accountUsageCount[tx.account.id] ?? 0) + 1;
+    }
   }
 
   DateTime get selectedMonth => _selectedMonth;
@@ -69,6 +141,13 @@ class ExpenseState extends ChangeNotifier {
   DateTime? get selectedCalendarDate => _selectedCalendarDate;
   set selectedCalendarDate(DateTime? date) {
     _selectedCalendarDate = date;
+    notifyListeners();
+  }
+
+  void resetToCurrentDate() {
+    final now = DateTime.now();
+    _selectedMonth = DateTime(now.year, now.month);
+    _selectedCalendarDate = null;
     notifyListeners();
   }
 
@@ -107,17 +186,13 @@ class ExpenseState extends ChangeNotifier {
     return selectedYearTransactions.fold(0.0, (sum, item) => sum + item.amount);
   }
 
-  // Dynamic daily totals for selected month (used for wave graph)
+  // Dynamic daily totals for active days in selected month (chronological order)
   List<double> get selectedMonthDailyTotals {
-    final daysInMonth = DateTime(_selectedMonth.year, _selectedMonth.month + 1, 0).day;
-    final List<double> totals = List.filled(daysInMonth, 0.0);
-    for (var tx in selectedMonthTransactions) {
-      final dayIdx = tx.timestamp.day - 1;
-      if (dayIdx >= 0 && dayIdx < daysInMonth) {
-        totals[dayIdx] += tx.amount;
-      }
-    }
-    return totals;
+    final grouped = selectedMonthGroupedByDate;
+    final sortedDates = grouped.keys.toList()..sort((a, b) => a.compareTo(b));
+    return sortedDates.map((date) =>
+      grouped[date]!.fold(0.0, (sum, tx) => sum + tx.amount)
+    ).toList();
   }
 
   List<CategoryItem> get allCategories => List.unmodifiable(_allCategories);
@@ -178,11 +253,13 @@ class ExpenseState extends ChangeNotifier {
 
   void addCategory(CategoryItem category) {
     _allCategories.add(category);
+    DatabaseService.instance.insertCategory(category, _allCategories.length);
     notifyListeners();
   }
 
   void addAccount(AccountItem account) {
     _allAccounts.add(account);
+    DatabaseService.instance.insertAccount(account, _allAccounts.length);
     notifyListeners();
   }
 
@@ -206,11 +283,14 @@ class ExpenseState extends ChangeNotifier {
     _categoryUsageCount[category.id] = (_categoryUsageCount[category.id] ?? 0) + 1;
     _accountUsageCount[account.id] = (_accountUsageCount[account.id] ?? 0) + 1;
 
+    DatabaseService.instance.insertTransaction(transaction);
+
     final trimmedDesc = description.trim();
     if (trimmedDesc.isNotEmpty && trimmedDesc.toLowerCase() != category.displayName.toLowerCase()) {
       final exists = _savedDescriptions.any((d) => d.toLowerCase() == trimmedDesc.toLowerCase());
       if (!exists) {
         _savedDescriptions.insert(0, trimmedDesc);
+        DatabaseService.instance.insertSavedDescription(trimmedDesc);
       }
     }
     notifyListeners();
@@ -239,7 +319,7 @@ class ExpenseState extends ChangeNotifier {
         _accountUsageCount[account.id] =
             (_accountUsageCount[account.id] ?? 0) + 1;
       }
-      _transactions[index] = ExpenseTransaction(
+      final updatedTx = ExpenseTransaction(
         id: id,
         amount: amount,
         category: category,
@@ -247,12 +327,16 @@ class ExpenseState extends ChangeNotifier {
         description: description.trim().isEmpty ? category.displayName : description,
         timestamp: date ?? oldTx.timestamp,
       );
+      _transactions[index] = updatedTx;
+
+      DatabaseService.instance.updateTransaction(updatedTx);
 
       final trimmedDesc = description.trim();
       if (trimmedDesc.isNotEmpty && trimmedDesc.toLowerCase() != category.displayName.toLowerCase()) {
         final exists = _savedDescriptions.any((d) => d.toLowerCase() == trimmedDesc.toLowerCase());
         if (!exists) {
           _savedDescriptions.insert(0, trimmedDesc);
+          DatabaseService.instance.insertSavedDescription(trimmedDesc);
         }
       }
       notifyListeners();
@@ -263,10 +347,12 @@ class ExpenseState extends ChangeNotifier {
     final index = _transactions.indexWhere((tx) => tx.id == id);
     if (index != -1) {
       final tx = _transactions.removeAt(index);
-      _categoryUsageCount[tx.category.id] =
-          (_categoryUsageCount[tx.category.id] ?? 1) - 1;
-      _accountUsageCount[tx.account.id] =
-          (_accountUsageCount[tx.account.id] ?? 1) - 1;
+      final currentCatCount = _categoryUsageCount[tx.category.id] ?? 1;
+      _categoryUsageCount[tx.category.id] = currentCatCount > 1 ? currentCatCount - 1 : 0;
+      final currentAccCount = _accountUsageCount[tx.account.id] ?? 1;
+      _accountUsageCount[tx.account.id] = currentAccCount > 1 ? currentAccCount - 1 : 0;
+
+      DatabaseService.instance.deleteTransaction(id);
       notifyListeners();
     }
   }
@@ -277,107 +363,27 @@ class ExpenseState extends ChangeNotifier {
         .fold(0.0, (sum, item) => sum + item.amount);
   }
 
-  void _loadInitialSampleData() {
-    final now = DateTime.now();
-    final dining = _allCategories.firstWhere((c) => c.id == 'dining');
-    final groceries = _allCategories.firstWhere((c) => c.id == 'groceries');
-    final transport = _allCategories.firstWhere((c) => c.id == 'transport');
-    final shopping = _allCategories.firstWhere((c) => c.id == 'shopping');
-    final health = _allCategories.firstWhere((c) => c.id == 'health');
-    final personal = _allCategories.firstWhere((c) => c.id == 'personal');
+  double getAccountTotalExpense(String accountId) {
+    return _transactions
+        .where((tx) => tx.account.id == accountId)
+        .fold(0.0, (sum, item) => sum + item.amount);
+  }
 
-    final upi = _allAccounts.firstWhere((a) => a.id == 'upi');
-    final bobBank = _allAccounts.firstWhere((a) => a.id == 'bob_bank');
-    final rupay = _allAccounts.firstWhere((a) => a.id == 'rupay_card');
-    final mastercard = _allAccounts.firstWhere((a) => a.id == 'mastercard');
+  List<ExpenseTransaction> getAccountTransactions(String accountId) {
+    return transactions
+        .where((tx) => tx.account.id == accountId)
+        .toList();
+  }
 
-    final sampleData = [
-      ExpenseTransaction(
-        id: '1',
-        amount: 1850.0,
-        category: health,
-        account: upi,
-        description: 'Super hair',
-        timestamp: DateTime(now.year, now.month, 1, 22, 37),
-      ),
-      ExpenseTransaction(
-        id: '2',
-        amount: 190.0,
-        category: health,
-        account: upi,
-        description: 'Super hair cut',
-        timestamp: DateTime(now.year, now.month, 2, 10, 51),
-      ),
-      ExpenseTransaction(
-        id: '3',
-        amount: 105.0,
-        category: personal,
-        account: bobBank,
-        description: 'Super nashta',
-        timestamp: DateTime(now.year, now.month, 2, 0, 1),
-      ),
-      ExpenseTransaction(
-        id: '4',
-        amount: 100.0,
-        category: personal,
-        account: rupay,
-        description: 'Super dadar',
-        timestamp: DateTime(now.year, now.month, 3, 19, 12),
-      ),
-      ExpenseTransaction(
-        id: '5',
-        amount: 100.0,
-        category: dining,
-        account: upi,
-        description: 'Super Nashta',
-        timestamp: DateTime(now.year, now.month, 2, 18, 13),
-      ),
-      ExpenseTransaction(
-        id: '6',
-        amount: 60.0,
-        category: dining,
-        account: upi,
-        description: 'Super Nashta',
-        timestamp: DateTime(now.year, now.month, 7, 16, 39),
-      ),
-      ExpenseTransaction(
-        id: '7',
-        amount: 56.0,
-        category: dining,
-        account: mastercard,
-        description: 'Super khana',
-        timestamp: DateTime(now.year, now.month, 1, 13, 8),
-      ),
-      ExpenseTransaction(
-        id: '8',
-        amount: 39.0,
-        category: dining,
-        account: upi,
-        description: 'Super Nashta',
-        timestamp: DateTime(now.year, now.month, 5, 18, 11),
-      ),
-      ExpenseTransaction(
-        id: '9',
-        amount: 25.0,
-        category: dining,
-        account: upi,
-        description: 'Super Nashta',
-        timestamp: DateTime(now.year, now.month, 8, 17, 28),
-      ),
-      ExpenseTransaction(
-        id: '10',
-        amount: 25.0,
-        category: transport,
-        account: upi,
-        description: 'IDFC bus',
-        timestamp: DateTime(now.year, now.month, 1, 10, 46),
-      ),
-    ];
+  double getCategoryTotalExpense(String categoryId) {
+    return _transactions
+        .where((tx) => tx.category.id == categoryId)
+        .fold(0.0, (sum, item) => sum + item.amount);
+  }
 
-    for (var tx in sampleData) {
-      _transactions.add(tx);
-      _categoryUsageCount[tx.category.id] = (_categoryUsageCount[tx.category.id] ?? 0) + 1;
-      _accountUsageCount[tx.account.id] = (_accountUsageCount[tx.account.id] ?? 0) + 1;
-    }
+  List<ExpenseTransaction> getCategoryTransactions(String categoryId) {
+    return transactions
+        .where((tx) => tx.category.id == categoryId)
+        .toList();
   }
 }

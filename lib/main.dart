@@ -3,19 +3,29 @@ import 'state/expense_state.dart';
 import 'theme/app_theme.dart';
 import 'screens/main_navigation_screen.dart';
 
-void main() {
-  runApp(const ExpenseTrackerApp());
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  final expenseState = ExpenseState();
+  await expenseState.initialize();
+  runApp(ExpenseTrackerApp(expenseState: expenseState));
 }
 
 class ExpenseTrackerApp extends StatefulWidget {
-  const ExpenseTrackerApp({super.key});
+  final ExpenseState? expenseState;
+  const ExpenseTrackerApp({super.key, this.expenseState});
 
   @override
   State<ExpenseTrackerApp> createState() => _ExpenseTrackerAppState();
 }
 
 class _ExpenseTrackerAppState extends State<ExpenseTrackerApp> {
-  final ExpenseState _expenseState = ExpenseState();
+  late final ExpenseState _expenseState;
+
+  @override
+  void initState() {
+    super.initState();
+    _expenseState = widget.expenseState ?? ExpenseState();
+  }
 
   @override
   Widget build(BuildContext context) {

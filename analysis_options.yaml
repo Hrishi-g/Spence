@@ -10,6 +10,8 @@
 include: package:flutter_lints/flutter.yaml
 
 analyzer:
+  errors:
+    non_const_argument_for_const_parameter: ignore
   exclude:
     - build/**
     - android/**

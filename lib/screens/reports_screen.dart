@@ -64,6 +64,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
       backgroundColor: Colors.transparent,
       builder: (ctx) => MonthYearPickerModal(
         initialDate: widget.expenseState.selectedMonth,
+        pickerMode: _selectedPeriod == 1 ? PickerMode.yearOnly : PickerMode.monthOnly,
         onSelected: (date) {
           setState(() {
             widget.expenseState.selectedMonth = date;
@@ -533,7 +534,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
     const double badgeRadius = 112;
 
     double currentAngle = -math.pi / 2;
-    final double gapAngle = items.length > 1 ? 0.08 : 0.0;
+    final double gapAngle = items.length > 1 ? math.min(0.06, (math.pi * 0.4) / items.length) : 0.0;
     final double totalAvailableAngle = 2 * math.pi - (items.length * gapAngle);
 
     for (var item in items) {
@@ -641,7 +642,7 @@ class _SegmentedDonutPainter extends CustomPainter {
     }
 
     double currentAngle = -math.pi / 2;
-    final double gapAngle = items.length > 1 ? 0.08 : 0.0;
+    final double gapAngle = items.length > 1 ? math.min(0.06, (math.pi * 0.4) / items.length) : 0.0;
     final double totalAvailableAngle = 2 * math.pi - (items.length * gapAngle);
 
     for (var item in items) {

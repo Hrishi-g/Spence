@@ -64,7 +64,7 @@ class AccountItem {
   int get hashCode => id.hashCode;
 
   static const List<AccountItem> defaults = [
-    AccountItem(id: 'bob_bank', displayName: 'Bob bank', icon: Icons.account_balance, color: Color(0xFF1E88E5)),
+    AccountItem(id: 'bank', displayName: 'Bank', icon: Icons.account_balance, color: Color(0xFF1E88E5)),
     AccountItem(id: 'mastercard', displayName: 'Mastercard', icon: Icons.credit_card, color: Color(0xFFEB001B)),
     AccountItem(id: 'rupay_card', displayName: 'Rupay card', icon: Icons.credit_card_outlined, color: Color(0xFF00838F)),
     AccountItem(id: 'upi', displayName: 'UPI', icon: Icons.qr_code_scanner, color: Color(0xFF2E7D32)),

@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:self_budget/main.dart';
+import 'package:spence/main.dart';
 
 void main() {
   testWidgets('ExpenseTrackerApp smoke test', (WidgetTester tester) async {

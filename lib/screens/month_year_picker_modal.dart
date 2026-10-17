@@ -1,14 +1,18 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 
+enum PickerMode { monthAndYear, monthOnly, yearOnly }
+
 class MonthYearPickerModal extends StatefulWidget {
   final DateTime initialDate;
   final ValueChanged<DateTime> onSelected;
+  final PickerMode pickerMode;
 
   const MonthYearPickerModal({
     super.key,
     required this.initialDate,
     required this.onSelected,
+    this.pickerMode = PickerMode.monthAndYear,
   });
 
   @override
@@ -24,7 +28,7 @@ class _MonthYearPickerModalState extends State<MonthYearPickerModal> {
     'July', 'August', 'September', 'October', 'November', 'December'
   ];
 
-  final List<int> _years = List.generate(7, (index) => 2024 + index);
+  final List<int> _years = List.generate(9, (index) => 2022 + index);
 
   @override
   void initState() {
@@ -33,8 +37,21 @@ class _MonthYearPickerModalState extends State<MonthYearPickerModal> {
     _selectedYear = widget.initialDate.year;
   }
 
+  String _getTitle() {
+    switch (widget.pickerMode) {
+      case PickerMode.monthOnly:
+        return 'Select Month';
+      case PickerMode.yearOnly:
+        return 'Select Year';
+      case PickerMode.monthAndYear:
+        return 'Select Month & Year';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final isYearOnly = widget.pickerMode == PickerMode.yearOnly;
+
     return Container(
       constraints: BoxConstraints(
         maxHeight: MediaQuery.of(context).size.height * 0.8,
@@ -64,9 +81,9 @@ class _MonthYearPickerModalState extends State<MonthYearPickerModal> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
-                  'Select Month & Year',
-                  style: TextStyle(
+                Text(
+                  _getTitle(),
+                  style: const TextStyle(
                     color: AppTheme.primaryText,
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
@@ -80,87 +97,137 @@ class _MonthYearPickerModalState extends State<MonthYearPickerModal> {
             ),
             const SizedBox(height: 8),
 
-            // Year Selector Row
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: _years.map((year) {
+            // YEAR SELECTOR (Horizontal scroll row for MonthAndYear mode)
+            if (widget.pickerMode == PickerMode.monthAndYear) ...[
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: _years.map((year) {
+                    final isSelected = year == _selectedYear;
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 8.0),
+                      child: ChoiceChip(
+                        showCheckmark: false,
+                        label: Text(
+                          '$year',
+                          style: TextStyle(
+                            color: isSelected ? Colors.black : Colors.white,
+                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                          ),
+                        ),
+                        selected: isSelected,
+                        selectedColor: AppTheme.accentGold,
+                        backgroundColor: AppTheme.surfaceLight,
+                        onSelected: (selected) {
+                          if (selected) {
+                            setState(() {
+                              _selectedYear = year;
+                            });
+                          }
+                        },
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
+
+            // YEAR GRID (When YearOnly mode)
+            if (isYearOnly) ...[
+              GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: _years.length,
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 3,
+                  mainAxisSpacing: 10,
+                  crossAxisSpacing: 10,
+                  childAspectRatio: 2.2,
+                ),
+                itemBuilder: (context, index) {
+                  final year = _years[index];
                   final isSelected = year == _selectedYear;
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 8.0),
-                    child: ChoiceChip(
-                      showCheckmark: false,
-                      label: Text(
-                        '$year',
-                        style: TextStyle(
-                          color: isSelected ? Colors.black : Colors.white,
-                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                  return GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        _selectedYear = year;
+                      });
+                    },
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? AppTheme.accentGold.withOpacity(0.25)
+                            : AppTheme.surfaceLight,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: isSelected ? AppTheme.accentGold : AppTheme.border,
+                          width: isSelected ? 2 : 1,
                         ),
                       ),
-                      selected: isSelected,
-                      selectedColor: AppTheme.accentGold,
-                      backgroundColor: AppTheme.surfaceLight,
-                      onSelected: (selected) {
-                        if (selected) {
-                          setState(() {
-                            _selectedYear = year;
-                          });
-                        }
-                      },
+                      alignment: Alignment.center,
+                      child: Text(
+                        '$year',
+                        style: TextStyle(
+                          color: isSelected ? AppTheme.accentGold : Colors.white,
+                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                          fontSize: 14,
+                        ),
+                      ),
                     ),
                   );
-                }).toList(),
+                },
               ),
-            ),
+              const SizedBox(height: 16),
+            ],
 
-            const SizedBox(height: 12),
-
-            // Months Grid (3x4)
-            GridView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: 12,
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 3,
-                mainAxisSpacing: 8,
-                crossAxisSpacing: 8,
-                childAspectRatio: 2.3,
-              ),
-              itemBuilder: (context, index) {
-                final monthNum = index + 1;
-                final isSelected = monthNum == _selectedMonth;
-                return GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      _selectedMonth = monthNum;
-                    });
-                  },
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: isSelected
-                          ? AppTheme.accentGold.withOpacity(0.25)
-                          : AppTheme.surfaceLight,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: isSelected ? AppTheme.accentGold : AppTheme.border,
-                        width: isSelected ? 2 : 1,
+            // MONTHS GRID (When MonthAndYear or MonthOnly mode)
+            if (!isYearOnly) ...[
+              GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: 12,
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 3,
+                  mainAxisSpacing: 8,
+                  crossAxisSpacing: 8,
+                  childAspectRatio: 2.3,
+                ),
+                itemBuilder: (context, index) {
+                  final monthNum = index + 1;
+                  final isSelected = monthNum == _selectedMonth;
+                  return GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        _selectedMonth = monthNum;
+                      });
+                    },
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? AppTheme.accentGold.withOpacity(0.25)
+                            : AppTheme.surfaceLight,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: isSelected ? AppTheme.accentGold : AppTheme.border,
+                          width: isSelected ? 2 : 1,
+                        ),
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        _months[index],
+                        style: TextStyle(
+                          color: isSelected ? AppTheme.accentGold : Colors.white,
+                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                          fontSize: 13,
+                        ),
                       ),
                     ),
-                    alignment: Alignment.center,
-                    child: Text(
-                      _months[index],
-                      style: TextStyle(
-                        color: isSelected ? AppTheme.accentGold : Colors.white,
-                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                        fontSize: 13,
-                      ),
-                    ),
-                  ),
-                );
-              },
-            ),
-
-            const SizedBox(height: 16),
+                  );
+                },
+              ),
+              const SizedBox(height: 16),
+            ],
 
             // Apply Button
             SizedBox(

@@ -16,19 +16,57 @@ class MainNavigationScreen extends StatefulWidget {
   State<MainNavigationScreen> createState() => _MainNavigationScreenState();
 }
 
-class _MainNavigationScreenState extends State<MainNavigationScreen> {
+class _MainNavigationScreenState extends State<MainNavigationScreen>
+    with WidgetsBindingObserver {
   int _currentIndex = 0;
+  int _pageVersion = 0;
 
-  void _openAddExpensePage() {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      widget.expenseState.resetToCurrentDate();
+      setState(() {
+        _pageVersion++;
+      });
+    }
+  }
+
+  void _onNavTap(int index) {
+    widget.expenseState.resetToCurrentDate();
+    setState(() {
+      if (_currentIndex != index) {
+        _currentIndex = index;
+      }
+      _pageVersion++;
+    });
+  }
+
+  void _openAddExpensePage([DateTime? date]) {
+    final targetDate = date ?? widget.expenseState.selectedCalendarDate;
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => AddExpenseScreen(
+        builder: (routeCtx) => AddExpenseScreen(
           expenseState: widget.expenseState,
+          initialDate: targetDate,
           onExpenseAdded: () {
-            Navigator.pop(context);
+            widget.expenseState.resetToCurrentDate();
+            Navigator.of(context).popUntil((route) => route.isFirst);
             setState(() {
               _currentIndex = 0;
+              _pageVersion++;
             });
           },
         ),
@@ -40,13 +78,23 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   Widget build(BuildContext context) {
     final List<Widget> pages = [
       HomeScreen(
+        key: ValueKey('home_$_pageVersion'),
         expenseState: widget.expenseState,
         onAddExpenseTap: _openAddExpensePage,
       ),
-      ReportsScreen(expenseState: widget.expenseState),
+      ReportsScreen(
+        key: ValueKey('reports_$_pageVersion'),
+        expenseState: widget.expenseState,
+      ),
       const SizedBox.shrink(), // Index 2 is center '+' button
-      AccountsScreen(expenseState: widget.expenseState),
-      InsightsScreen(expenseState: widget.expenseState),
+      AccountsScreen(
+        key: ValueKey('accounts_$_pageVersion'),
+        expenseState: widget.expenseState,
+      ),
+      InsightsScreen(
+        key: ValueKey('insights_$_pageVersion'),
+        expenseState: widget.expenseState,
+      ),
     ];
 
     return Scaffold(
@@ -75,7 +123,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
               children: [
                 _buildNavItem(icon: Icons.home_filled, label: 'Home', index: 0),
                 _buildNavItem(icon: Icons.insert_chart_outlined, label: 'Reports', index: 1),
-                
+
                 // CENTER HIGHLIGHTED GOLDEN '+' FAB
                 GestureDetector(
                   onTap: _openAddExpensePage,
@@ -114,11 +162,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   Widget _buildNavItem({required IconData icon, required String label, required int index}) {
     final isSelected = _currentIndex == index;
     return InkWell(
-      onTap: () {
-        setState(() {
-          _currentIndex = index;
-        });
-      },
+      onTap: () => _onNavTap(index),
       borderRadius: BorderRadius.circular(16),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),

@@ -19,7 +19,6 @@ class CreateCustomItemScreen extends StatefulWidget {
 
 class _CreateCustomItemScreenState extends State<CreateCustomItemScreen> {
   final TextEditingController _nameController = TextEditingController();
-  int _selectedTab = 0; // 0: Expenses, 1: Income
   int _selectedStyle = 0; // Style1, Style2, Style3, Style4
   int _selectedIconIndex = 0;
 
@@ -123,19 +122,7 @@ class _CreateCustomItemScreenState extends State<CreateCustomItemScreen> {
         body: SafeArea(
           child: Column(
             children: [
-              const SizedBox(height: 10),
-
-              // Tab Bar: Expenses / Income
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  _buildTopTab('Expenses', 0),
-                  const SizedBox(width: 40),
-                  _buildTopTab('Income', 1),
-                ],
-              ),
-
-              const SizedBox(height: 24),
+              const SizedBox(height: 16),
 
               // Center Selected Icon Preview Circle
               Container(
@@ -198,21 +185,13 @@ class _CreateCustomItemScreenState extends State<CreateCustomItemScreen> {
                         margin: const EdgeInsets.only(right: 24),
                         child: Column(
                           children: [
-                            Row(
-                              children: [
-                                Text(
-                                  'Style${index + 1}',
-                                  style: TextStyle(
-                                    color: isSelected ? Colors.white : Colors.white54,
-                                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                                    fontSize: 15,
-                                  ),
-                                ),
-                                if (index > 0) ...[
-                                  const SizedBox(width: 4),
-                                  const Icon(Icons.workspace_premium, color: AppTheme.accentGold, size: 14),
-                                ],
-                              ],
+                            Text(
+                              'Style${index + 1}',
+                              style: TextStyle(
+                                color: isSelected ? Colors.white : Colors.white54,
+                                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                fontSize: 15,
+                              ),
                             ),
                             const SizedBox(height: 4),
                             if (isSelected)
@@ -280,37 +259,5 @@ class _CreateCustomItemScreenState extends State<CreateCustomItemScreen> {
     );
   }
 
-  Widget _buildTopTab(String title, int index) {
-    final isSelected = _selectedTab == index;
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          _selectedTab = index;
-        });
-      },
-      child: Column(
-        children: [
-          Text(
-            title,
-            style: TextStyle(
-              color: isSelected ? Colors.white : Colors.white38,
-              fontSize: 16,
-              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-            ),
-          ),
-          const SizedBox(height: 4),
-          if (isSelected)
-            Container(
-              width: 50,
-              height: 3,
-              decoration: BoxDecoration(
-                color: AppTheme.accentGold,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
 }
 

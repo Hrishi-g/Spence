@@ -192,8 +192,8 @@ class CategoryDetailsScreen extends StatelessWidget {
                         final subText = isAccount
                             ? tx.category.displayName
                             : tx.account.displayName;
-                        final subIcon = isAccount ? tx.category.icon : icon;
-                        final subColor = isAccount ? tx.category.color : color;
+                        final subIcon = isAccount ? tx.category.icon : tx.account.icon;
+                        final subColor = isAccount ? tx.category.color : tx.account.color;
 
                         return Container(
                           margin: const EdgeInsets.only(bottom: 10),
